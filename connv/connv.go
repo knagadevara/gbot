@@ -1,4 +1,4 @@
-package utl
+package connv
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	utl . "Uitil"
+	"github.com/knagadevara/gbot/utl"
 
 	ssh "golang.org/x/crypto/ssh"
 	kh "golang.org/x/crypto/ssh/knownhosts"
