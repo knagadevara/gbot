@@ -1,0 +1,4 @@
+user_name: "markus"
+ssh_path: "/home/markus/.ssh/"
+ssh_key_name: "autoKey"
+jumpstation: true

@@ -16,10 +16,7 @@ import (
 func LoadSshConfig(sshBasePath string, sshUserName string, sshPkName string) *ssh.ClientConfig {
 	knownHosts := sshBasePath + "known_hosts"
 	privateKeyFile := sshBasePath + sshPkName
-	pkBuf, err := utl.ReadFile(privateKeyFile)
-	if err != nil {
-		log.Fatal(err)
-	}
+	pkBuf := utl.LoadFile(privateKeyFile)
 
 	signer, err := ssh.ParsePrivateKey(pkBuf)
 	if err != nil {
