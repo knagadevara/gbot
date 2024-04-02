@@ -11,5 +11,6 @@ type SShCfg struct {
 	UserName string `yaml:"user_name"`
 	SshBase  string `yaml:"ssh_path"`
 	KeyName  string `yaml:"ssh_key_name"`
-	Jump     bool   `yaml:"jumpstation"`
+	JumpHost bool   `yaml:"jumpstation"`
+	JumpUser string `yaml:"jump_user_name"`
 }
