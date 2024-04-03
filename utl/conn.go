@@ -103,27 +103,26 @@ func CreateSessionNoTrm(connect *ssh.Client) (*ssh.Session, io.Reader) {
 	return session, StdOutPipe
 }
 
-func FireCommands(rmtHstSshClient, jmpBxSshClient *ssh.Client, commands ...string) (map[string]string, error) {
+func FireCommands(rmtHstSshClient *ssh.Client, commands ...string) (map[string]string, error) {
 
 	output := make(map[string]string)
-	defer rmtHstSshClient.Close()
-	defer jmpBxSshClient.Close()
 
 	for _, cmd := range commands {
 		sshSession, StdOutPipe := CreateSessionNoTrm(rmtHstSshClient)
 		defer sshSession.Close()
-		if cmOut, err := sshSession.CombinedOutput(cmd); err != nil {
+		cmOut, err := sshSession.CombinedOutput(cmd)
+		if err != nil {
 			log.Fatal(cmd, err)
 			return nil, err
-		} else {
-			go func() {
-				if _, err := io.Copy(os.Stdout, StdOutPipe); err != nil {
-					log.Fatalf("Error copying stdout: %v", err)
-				}
-			}()
-			output[cmd] = string(cmOut)
-			fmt.Printf("%v->%v\n", cmd, string(cmOut))
 		}
+		go func() {
+			if _, err := io.Copy(os.Stdout, StdOutPipe); err != nil {
+				log.Fatalf("Error copying stdout: %v", err)
+			}
+			fmt.Printf("%v->%v\n", cmd, string(cmOut))
+		}()
+		output[cmd] = string(cmOut)
+
 	}
 	return output, nil
 }

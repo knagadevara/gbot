@@ -33,7 +33,20 @@ func init() {
 func main() {
 	if hj.SSHConfig.Jump {
 		rmtHstSshClt, jumpSshClient, err := hj.CreateSshClientJumpHost()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer rmtHstSshClt.Close()
+		defer jumpSshClient.Close()
+		utl.FireCommands(rmtHstSshClt, "ls", "pwd", "who")
+
 	} else {
 		hstSshClt, err := hj.CreateSshClientHost()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer hstSshClt.Close()
+		utl.FireCommands(hstSshClt, "ls", "pwd", "who")
+
 	}
 }
