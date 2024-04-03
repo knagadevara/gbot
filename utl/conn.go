@@ -172,3 +172,23 @@ func (hj *HJSShConfig) CreateSshClientHost() (*ssh.Client, error) {
 	}
 	return sshClient, nil
 }
+
+func (hj *HJSShConfig) Execute(commands ...string) {
+	if hj.SSHConfig.Jump {
+		rmtHstSshClt, jumpSshClient, err := hj.CreateSshClientJumpHost()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer rmtHstSshClt.Close()
+		defer jumpSshClient.Close()
+		FireCommands(rmtHstSshClt, commands...)
+
+	} else {
+		hstSshClt, err := hj.CreateSshClientHost()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer hstSshClt.Close()
+		FireCommands(hstSshClt, commands...)
+	}
+}

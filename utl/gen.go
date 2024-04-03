@@ -74,12 +74,13 @@ func SourceHostName() string {
 	return hostName
 }
 
-func ParseCfg(yamlBuf []byte) (*SShCfg, *HostAuth, *BastionAuth, *DCDN) {
+func ParseCfg(yamlBuf []byte) HJSShConfig {
 	var (
 		sshConfig   SShCfg
 		hostAuth    HostAuth
 		bastionAuth BastionAuth
 		dcdn        DCDN
+		hj          HJSShConfig
 	)
 	err := yl.Unmarshal(yamlBuf, &sshConfig)
 	if err != nil {
@@ -97,6 +98,15 @@ func ParseCfg(yamlBuf []byte) (*SShCfg, *HostAuth, *BastionAuth, *DCDN) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	return &sshConfig, &hostAuth, &bastionAuth, &dcdn
+	hj.SSHConfig = &sshConfig
+	hj.HostAuth = &hostAuth
+	hj.BastionAuth = &bastionAuth
+	hj.Dx = &dcdn
+	hstName := SourceHostName()
+	err = hj.MapHostDc(hstName)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	hj.DisplayHostDetails()
+	return hj
 }
