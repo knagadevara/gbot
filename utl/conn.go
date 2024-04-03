@@ -1,4 +1,4 @@
-package connv
+package utl
 
 import (
 	"fmt"
@@ -7,28 +7,25 @@ import (
 	"net"
 	"os"
 
-	"github.com/knagadevara/gbot/utl"
-
 	ssh "golang.org/x/crypto/ssh"
 )
 
-func LoadSshConfig(sshBasePath string, sshUserName string, sshPkName string) *ssh.ClientConfig {
+func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
+
 	// knownHosts := sshBasePath + "known_hosts"
-	privateKeyFile := sshBasePath + sshPkName
-	pkBuf := utl.LoadFile(privateKeyFile)
-
-	signer, err := ssh.ParsePrivateKey(pkBuf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// knHtsFile, err := kh.New(knownHosts)
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
 
+	pkBuf := LoadFile(sh.Path + sh.PK)
+	signer, err := ssh.ParsePrivateKey(pkBuf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	sshClientConfig := &ssh.ClientConfig{
-		User: sshUserName,
+		User: userName,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
@@ -129,4 +126,50 @@ func FireCommands(rmtHstSshClient, jmpBxSshClient *ssh.Client, commands ...strin
 		}
 	}
 	return output, nil
+}
+
+func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
+
+	sshJumpConfig := hj.SSHConfig.LoadSshConfig(hj.BastionAuth.Uname)
+	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname)
+
+	sshJumpClient, err := DialHost(
+		sshJumpConfig,
+		hj.BastionAuth.Name,
+		hj.SSHConfig.Port)
+	if err != nil {
+		log.Fatalln(err)
+		return nil, nil, err
+	}
+
+	hostConnection, jumpCLient, err := ConnHost(sshJumpClient, hj.HostAuth.Uname)
+	if err != nil {
+		log.Fatalln(err)
+		return nil, nil, err
+	}
+
+	rmtHstSshClient, jmpBxSshClient, err := MakeNewClientConn(
+		hostConnection,
+		jumpCLient,
+		hj.HostAuth.Uname,
+		sshRmtConfig)
+
+	if err != nil {
+		log.Fatalln(err)
+		return nil, nil, err
+	}
+	return rmtHstSshClient, jmpBxSshClient, nil
+
+}
+
+func (hj *HJSShConfig) CreateSshClientHost() (*ssh.Client, error) {
+	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname)
+	sshClient, err := DialHost(sshRmtConfig,
+		hj.HostAuth.Name,
+		hj.SSHConfig.Port)
+	if err != nil {
+		log.Fatalln(err)
+		return nil, err
+	}
+	return sshClient, nil
 }

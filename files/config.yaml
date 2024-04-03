@@ -1,0 +1,10 @@
+---
+
+host.uname: "root"
+bastion.prefix: "jumpbox"
+bastion.uname: "rambo"
+ssh.jump: true
+ssh.path: "/home/rambo/.ssh/"
+ssh.pkname: "secret.pem"
+ssh.port: 22
+domainName: ".rocky.com"
