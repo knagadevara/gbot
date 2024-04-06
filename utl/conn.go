@@ -196,4 +196,5 @@ func CloseConn(host, jump *ssh.Client) {
 	} else {
 		host.Close()
 	}
+	fmt.Println("Connection Closed")
 }

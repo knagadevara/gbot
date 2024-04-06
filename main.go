@@ -2,8 +2,9 @@ package main
 
 import (
 	"os"
+	"strings"
 
-	"github.com/knagadevara/gbot/listDir"
+	cmd "github.com/knagadevara/gbot/commands"
 	utl "github.com/knagadevara/gbot/utl"
 	"golang.org/x/crypto/ssh"
 )
@@ -23,9 +24,10 @@ func main() {
 	host, jump = hj.JumpOrNot()
 	defer utl.CloseConn(host, jump)
 
-	argument := os.Args[0]
+	argument := strings.TrimSpace(string(os.Args[0]))
+
 	switch argument {
-	case "ls":
-		listDir.Executor(host)
+	case "stats":
+		cmd.GeneralSystemStats(host)
 	}
 }

@@ -1,10 +1,10 @@
 ---
 
-host.uname: "root"
-bastion.prefix: "jumpbox"
-bastion.uname: "rambo"
-ssh.jump: true
-ssh.path: "/home/rambo/.ssh/"
-ssh.pkname: "secret.pem"
+host.uname: "knagadevara"
+bastion.prefix: ""
+bastion.uname: ""
+ssh.jump: false
+ssh.path: "/home/knagadevara/.ssh/"
+ssh.pkname: "infrax.pem"
 ssh.port: 22
-domainName: ".rocky.com"
+domainName: ".infrax.com"
