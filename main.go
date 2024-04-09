@@ -1,8 +1,7 @@
 package main
 
 import (
-	"os"
-	"strings"
+	"runtime"
 
 	cmd "github.com/knagadevara/gbot/commands"
 	utl "github.com/knagadevara/gbot/utl"
@@ -16,6 +15,7 @@ var (
 )
 
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	yamlBuf = utl.LoadFile("files/config.yaml")
 	hj = utl.ParseCfg(yamlBuf)
 }
@@ -23,11 +23,6 @@ func init() {
 func main() {
 	host, jump = hj.JumpOrNot()
 	defer utl.CloseConn(host, jump)
+	cmd.GeneralSystemStats(host)
 
-	argument := strings.TrimSpace(string(os.Args[0]))
-
-	switch argument {
-	case "stats":
-		cmd.GeneralSystemStats(host)
-	}
 }

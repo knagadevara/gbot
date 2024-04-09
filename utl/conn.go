@@ -40,7 +40,6 @@ func DialHost(sshConfig *ssh.ClientConfig, sshAddr string, sshPort int8) (*ssh.C
 		log.Fatal("unable to establish any connection: ", err)
 		return nil, err
 	} else {
-		fmt.Println("Connection Established..")
 		return cClient, nil
 	}
 }
@@ -50,7 +49,6 @@ func ConnHost(jumpCLient *ssh.Client, sshAddr string) (net.Conn, *ssh.Client, er
 		log.Fatal("unable to Establish Persistant Connection: ", err)
 		return nil, nil, err
 	} else {
-		fmt.Println("Persistant Connection Established to Jump box...")
 		return hostConnection, jumpCLient, nil
 	}
 }
@@ -64,31 +62,27 @@ func MakeNewClientConn(remoteHostConn net.Conn, jmpBxSshClient *ssh.Client, remo
 	}
 	// Create SSH client for remote host
 	rmtHstSshClient := ssh.NewClient(rmtHstSshConn, remoteChannels, remoteRequests)
-	fmt.Println("Connection Established to Host Established...")
 	return rmtHstSshClient, jmpBxSshClient, nil
 }
 
-func CreateSession(connect *ssh.Client) (*ssh.Session, io.Reader) {
+func CreateStdOutPipedSession(connect *ssh.Client) (*ssh.Session, io.Reader) {
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          0,     // disable echoing
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
-	if session, err := connect.NewSession(); err != nil {
+	session, err := connect.NewSession()
+	if err != nil {
 		log.Fatal("unable to create session: ", err)
-	} else {
-		if err := session.RequestPty("xterm", 40, 80, modes); err != nil {
-			log.Fatal("request for pseudo terminal failed: ", err)
-		} else {
-			if StdOutPipe, err := session.StdoutPipe(); err != nil {
-				log.Fatalf("Unable to setup stdout for session: %v", err)
-			} else {
-				fmt.Println("Session Established...")
-				return session, StdOutPipe
-			}
-		}
 	}
-	return nil, nil
+	if err := session.RequestPty("xterm", 40, 80, modes); err != nil {
+		log.Fatal("request for pseudo terminal failed: ", err)
+	}
+	StdOutPipe, err := session.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Unable to setup stdout for session: %v", err)
+	}
+	return session, StdOutPipe
 }
 
 func CreateSessionNoTrm(connect *ssh.Client) (*ssh.Session, io.Reader) {
@@ -103,10 +97,24 @@ func CreateSessionNoTrm(connect *ssh.Client) (*ssh.Session, io.Reader) {
 	return session, StdOutPipe
 }
 
-func FireCommands(rmtHstSshClient *ssh.Client, commands ...string) (map[string]string, error) {
+func CreateSession(connect *ssh.Client) *ssh.Session {
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,     // disable echoing
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+	}
+	session, err := connect.NewSession()
+	if err != nil {
+		log.Fatal("unable to create session: ", err)
+	}
+	if err := session.RequestPty("xterm", 40, 80, modes); err != nil {
+		log.Fatal("request for pseudo terminal failed: ", err)
+	}
+	return session
+}
 
+func RunCommandStdOut(rmtHstSshClient *ssh.Client, commands ...string) (map[string]string, error) {
 	output := make(map[string]string)
-
 	for _, cmd := range commands {
 		sshSession, StdOutPipe := CreateSessionNoTrm(rmtHstSshClient)
 		defer sshSession.Close()
@@ -125,6 +133,31 @@ func FireCommands(rmtHstSshClient *ssh.Client, commands ...string) (map[string]s
 
 	}
 	return output, nil
+}
+
+func RunCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]string {
+	output := make(map[string]string)
+	sessionOutChan := make(chan map[string]string)
+	go func() {
+		for _, cmd := range commands {
+			session := CreateSession(rmtHstSshClient)
+			defer session.Close()
+			cmOut, err := session.CombinedOutput(cmd)
+			if err != nil {
+				log.Fatal(cmd, err)
+			}
+			sessionOutChan <- map[string]string{cmd: string(cmOut)}
+		}
+		close(sessionOutChan)
+	}()
+
+	for v := range sessionOutChan {
+		for key, val := range v {
+			output[key] = string(val)
+			fmt.Printf("\n%v->\t%v\n", key, val)
+		}
+	}
+	return output
 }
 
 func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
