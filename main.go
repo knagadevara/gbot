@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	hj         utl.HJSShConfig
+	hj         *utl.HJSShConfig
 	host, jump *ssh.Client
 	yamlBuf    []byte
 )

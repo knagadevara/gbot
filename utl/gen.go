@@ -74,7 +74,7 @@ func SourceHostName() string {
 	return hostName
 }
 
-func ParseCfg(yamlBuf []byte) HJSShConfig {
+func ParseCfg(yamlBuf []byte) *HJSShConfig {
 	var (
 		sshConfig   SShCfg
 		hostAuth    HostAuth
@@ -108,5 +108,5 @@ func ParseCfg(yamlBuf []byte) HJSShConfig {
 		log.Fatalf("%v", err)
 	}
 	hj.DisplayHostDetails()
-	return hj
+	return &hj
 }
