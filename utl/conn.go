@@ -159,15 +159,15 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]
 	}()
 
 	go func() {
+		defer close(sessionOutChan)
 		wg.Wait()
-		close(sessionOutChan)
 	}()
 
 	for cmdOutMap := range sessionOutChan {
 		go func(stringMap map[string]string) {
 			for key, val := range stringMap {
 				output[key] = string(val)
-				fmt.Printf("\n%v->\t%v\n", key, val)
+				fmt.Printf("\n%v\n%v\n", key, val)
 			}
 		}(cmdOutMap)
 	}
@@ -244,5 +244,4 @@ func CloseConn(host, jump *ssh.Client) {
 	} else {
 		host.Close()
 	}
-	fmt.Println("Connection Closed")
 }

@@ -13,10 +13,9 @@ import (
 
 // Opens a file and makes it available in byte array
 func LoadFile(flPth string) []byte {
-	fmt.Println("Loading " + flPth)
 	flBf, err := os.ReadFile(flPth)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to resolve config path: %v", err)
 		return nil
 	} else {
 		return flBf
@@ -49,10 +48,13 @@ func (hj *HJSShConfig) MapHostDc(hostname string) error {
 }
 
 func (hj *HJSShConfig) DisplayHostDetails() {
-	fmt.Printf(
-		"HostName:\t%v\nBastionName:\t%v\n",
-		hj.HostAuth.Name,
-		hj.BastionAuth.Name)
+	if hj.SSHConfig.Jump {
+		fmt.Printf("\nHostName:\t%v\nBastionName:\t%v\n",
+			hj.HostAuth.Name,
+			hj.BastionAuth.Name)
+	} else {
+		fmt.Printf("\nHostName:\t%v\n", hj.HostAuth.Name)
+	}
 }
 
 func SourceHostName() string {
