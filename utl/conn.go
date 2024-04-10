@@ -143,20 +143,22 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]
 	var wg sync.WaitGroup
 	wg.Add(len(commands))
 
-	go func() {
-		for _, command := range commands {
-			session := CreateSession(rmtHstSshClient)
-			go func(session *ssh.Session, hotcommand string) {
-				defer wg.Done()
-				defer session.Close()
-				cmOut, err := session.CombinedOutput(hotcommand)
-				if err != nil {
-					log.Fatal(hotcommand, err)
-				}
-				sessionOutChan <- map[string]string{hotcommand: string(cmOut)}
-			}(session, command)
+	executeCommand := func(hotcommand string) {
+		defer wg.Done()
+
+		session := CreateSession(rmtHstSshClient)
+		defer session.Close()
+
+		cmOut, err := session.CombinedOutput(hotcommand)
+		if err != nil {
+			log.Fatal(hotcommand, err)
 		}
-	}()
+		sessionOutChan <- map[string]string{hotcommand: string(cmOut)}
+	}
+
+	for _, command := range commands {
+		go executeCommand(command)
+	}
 
 	go func() {
 		defer close(sessionOutChan)
