@@ -6,5 +6,5 @@ import (
 )
 
 func GeneralSystemStats(host *ssh.Client) {
-	utl.RunCommand(host, "uname -n", "uptime", "free -h")
+	utl.ExecuteCommand(host, "uname -n", "uptime", "free -h")
 }

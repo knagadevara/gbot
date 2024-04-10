@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 
 	ssh "golang.org/x/crypto/ssh"
 )
@@ -135,28 +136,42 @@ func RunCommandStdOut(rmtHstSshClient *ssh.Client, commands ...string) (map[stri
 	return output, nil
 }
 
-func RunCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]string {
+func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]string {
+
 	output := make(map[string]string)
 	sessionOutChan := make(chan map[string]string)
+	var wg sync.WaitGroup
+	wg.Add(len(commands))
+
 	go func() {
-		for _, cmd := range commands {
+		for _, command := range commands {
 			session := CreateSession(rmtHstSshClient)
-			defer session.Close()
-			cmOut, err := session.CombinedOutput(cmd)
-			if err != nil {
-				log.Fatal(cmd, err)
-			}
-			sessionOutChan <- map[string]string{cmd: string(cmOut)}
+			go func(session *ssh.Session, hotcommand string) {
+				defer wg.Done()
+				defer session.Close()
+				cmOut, err := session.CombinedOutput(hotcommand)
+				if err != nil {
+					log.Fatal(hotcommand, err)
+				}
+				sessionOutChan <- map[string]string{hotcommand: string(cmOut)}
+			}(session, command)
 		}
+	}()
+
+	go func() {
+		wg.Wait()
 		close(sessionOutChan)
 	}()
 
-	for v := range sessionOutChan {
-		for key, val := range v {
-			output[key] = string(val)
-			fmt.Printf("\n%v->\t%v\n", key, val)
-		}
+	for cmdOutMap := range sessionOutChan {
+		go func(stringMap map[string]string) {
+			for key, val := range stringMap {
+				output[key] = string(val)
+				fmt.Printf("\n%v->\t%v\n", key, val)
+			}
+		}(cmdOutMap)
 	}
+
 	return output
 }
 
