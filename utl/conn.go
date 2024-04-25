@@ -11,18 +11,12 @@ import (
 	ssh "golang.org/x/crypto/ssh"
 )
 
+// LoadSshConfig loads SSH configuration for a given user
 func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
-
-	// knownHosts := sshBasePath + "known_hosts"
-	// knHtsFile, err := kh.New(knownHosts)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	pkBuf := LoadFile(sh.Path + sh.PK)
-	signer, err := ssh.ParsePrivateKey(pkBuf)
+	privateKeyBuf := LoadFile(sh.Path + sh.PK)
+	signer, err := ssh.ParsePrivateKey(privateKeyBuf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to parse private key: %v", err)
 	}
 
 	sshClientConfig := &ssh.ClientConfig{
@@ -31,7 +25,6 @@ func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// HostKeyCallback: knHtsFile,
 	}
 	return sshClientConfig
 }
@@ -41,36 +34,37 @@ func DialHost(sshConfig *ssh.ClientConfig, sshAddr string, sshPort int8) (*ssh.C
 		log.Fatal("unable to establish any connection: ", err)
 		return nil, err
 	} else {
+		fmt.Println("Dialed first Host")
 		return cClient, nil
 	}
 }
 
-func ConnHost(jumpCLient *ssh.Client, sshAddr string) (net.Conn, *ssh.Client, error) {
-	if hostConnection, err := jumpCLient.Dial("tcp", fmt.Sprintf("%s:22", sshAddr)); err != nil {
+func ConnHost(jumpCLient *ssh.Client, sshAddr string, sshPort int8) (net.Conn, *ssh.Client, error) {
+	hostConnection, err := jumpCLient.Dial("tcp", fmt.Sprintf("%s:%d", sshAddr, sshPort))
+	if err != nil {
 		log.Fatal("unable to Establish Persistant Connection: ", err)
 		return nil, nil, err
-	} else {
-		return hostConnection, jumpCLient, nil
 	}
+	fmt.Println("Dialed Connection from first Host")
+	return hostConnection, jumpCLient, nil
 }
 
 func MakeNewClientConn(remoteHostConn net.Conn, jmpBxSshClient *ssh.Client, remoteAddr string, remoteConfig *ssh.ClientConfig) (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
-	// Establish SSH connection to remote host through jump host connection
 	rmtHstSshConn, remoteChannels, remoteRequests, err := ssh.NewClientConn(remoteHostConn, remoteAddr, remoteConfig)
 	if err != nil {
 		fmt.Printf("Failed to establish SSH connection to remote host through jump host: %v\n", err)
 		return nil, nil, err
 	}
-	// Create SSH client for remote host
 	rmtHstSshClient := ssh.NewClient(rmtHstSshConn, remoteChannels, remoteRequests)
+	fmt.Println("Created a rule and forging connection")
 	return rmtHstSshClient, jmpBxSshClient, nil
 }
 
 func CreateStdOutPipedSession(connect *ssh.Client) (*ssh.Session, io.Reader) {
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,     // disable echoing
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
-		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+		ssh.ECHO:          0,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
 	}
 	session, err := connect.NewSession()
 	if err != nil {
@@ -100,9 +94,9 @@ func CreateSessionNoTrm(connect *ssh.Client) (*ssh.Session, io.Reader) {
 
 func CreateSession(connect *ssh.Client) *ssh.Session {
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,     // disable echoing
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
-		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+		ssh.ECHO:          0,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
 	}
 	session, err := connect.NewSession()
 	if err != nil {
@@ -131,13 +125,11 @@ func RunCommandStdOut(rmtHstSshClient *ssh.Client, commands ...string) (map[stri
 			fmt.Printf("%v->%v\n", cmd, string(cmOut))
 		}()
 		output[cmd] = string(cmOut)
-
 	}
 	return output, nil
 }
 
 func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) chan map[string]string {
-
 	sessionOutChan := make(chan map[string]string, len(commands))
 	var wg sync.WaitGroup
 	wg.Add(len(commands))
@@ -168,7 +160,6 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) chan map[st
 }
 
 func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
-
 	sshJumpConfig := hj.SSHConfig.LoadSshConfig(hj.BastionAuth.Uname)
 	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname)
 
@@ -181,7 +172,10 @@ func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *s
 		return nil, nil, err
 	}
 
-	hostConnection, jumpCLient, err := ConnHost(sshJumpClient, hj.HostAuth.Uname)
+	hostConnection, jumpCLient, err := ConnHost(
+		sshJumpClient,
+		hj.HostAuth.Uname,
+		hj.SSHConfig.Port)
 	if err != nil {
 		log.Fatalln(err)
 		return nil, nil, err

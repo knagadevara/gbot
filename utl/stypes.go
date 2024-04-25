@@ -1,21 +1,5 @@
 package utl
 
-type DCDN struct {
-	DataCenter string
-	DomainName string `yaml:"domainName"`
-}
-
-type HostAuth struct {
-	Name  string
-	Uname string `yaml:"host.uname"`
-}
-
-type BastionAuth struct {
-	Name   string
-	Uname  string `yaml:"bastion.uname"`
-	Prefix string `yaml:"bastion.prefix"`
-}
-
 type SShCfg struct {
 	Path string `yaml:"ssh.path"`
 	PK   string `yaml:"ssh.pkname"`
@@ -23,9 +7,25 @@ type SShCfg struct {
 	Jump bool   `yaml:"ssh.jump"`
 }
 
+type HostAuth struct {
+	Name  string `yaml:"hostname"`
+	Uname string `yaml:"uname"`
+}
+
+type BastionAuth struct {
+	Name   string `yaml:"bastion.hostname"`
+	Uname  string `yaml:"bastion.uname"`
+	Prefix string `yaml:"bastion.prefix"`
+}
+
+type DCDN struct {
+	DataCenter string `yaml:"datacenter"`
+	DomainName string `yaml:"domainName"`
+}
+
 type HJSShConfig struct {
-	HostAuth    *HostAuth
-	BastionAuth *BastionAuth
-	SSHConfig   *SShCfg
-	Dx          *DCDN
+	HostAuth    *HostAuth    `yaml:"host"`
+	BastionAuth *BastionAuth `yaml:"bastion"`
+	SSHConfig   *SShCfg      `yaml:"ssh"`
+	Dx          *DCDN        `yaml:"dcdn"`
 }

@@ -25,9 +25,8 @@ func LoadFile(flPth string) []byte {
 // takes a host name and gives out full domain name and host name
 func (hj *HJSShConfig) MapHostDc(hostname string) error {
 	if hostname == "" {
-		return errors.ErrUnsupported
+		return errors.New("empty hostname")
 	} else {
-
 		tmpVar := strings.Split(hostname, "-")
 
 		hj.Dx.DataCenter = tmpVar[1]
@@ -75,7 +74,6 @@ func SourceHostName() string {
 	}
 	return hostName
 }
-
 func ParseCfg(yamlBuf []byte) *HJSShConfig {
 	var (
 		sshConfig   SShCfg
