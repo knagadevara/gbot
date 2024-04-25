@@ -136,10 +136,9 @@ func RunCommandStdOut(rmtHstSshClient *ssh.Client, commands ...string) (map[stri
 	return output, nil
 }
 
-func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]string {
+func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) chan map[string]string {
 
-	output := make(map[string]string)
-	sessionOutChan := make(chan map[string]string)
+	sessionOutChan := make(chan map[string]string, len(commands))
 	var wg sync.WaitGroup
 	wg.Add(len(commands))
 
@@ -165,16 +164,7 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) map[string]
 		wg.Wait()
 	}()
 
-	for cmdOutMap := range sessionOutChan {
-		go func(stringMap map[string]string) {
-			for key, val := range stringMap {
-				output[key] = string(val)
-				fmt.Printf("\n%v\n%v\n", key, val)
-			}
-		}(cmdOutMap)
-	}
-
-	return output
+	return sessionOutChan
 }
 
 func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {

@@ -112,3 +112,11 @@ func ParseCfg(yamlBuf []byte) *HJSShConfig {
 	hj.DisplayHostDetails()
 	return &hj
 }
+
+func PrintHashMap(sessionOutChan chan map[string]string) {
+	for cmdOutMap := range sessionOutChan {
+		for key, val := range cmdOutMap {
+			fmt.Printf("\n%v\n%v\n", key, val)
+		}
+	}
+}
