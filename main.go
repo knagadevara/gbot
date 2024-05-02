@@ -22,6 +22,6 @@ func init() {
 }
 
 func main() {
-	defer utl.CloseConn(host, jump)
 	commands.GeneralSystemStats(host)
+	defer utl.CloseConn(host, jump)
 }
