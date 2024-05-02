@@ -15,6 +15,7 @@ import (
 
 // LoadSshConfig loads SSH configuration for a given user
 func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
+
 	privateKeyBuf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
 	signer, err := ssh.ParsePrivateKey(privateKeyBuf)
 	if err != nil {
@@ -22,7 +23,12 @@ func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
 	}
 
 	// publicKeyBuf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pub"}, ""))
-	// hostKey, err := ssh.ParsePublicKey(publicKeyBuf)
+	// hostKey, _, _, _, err := ssh.ParseAuthorizedKey(publicKeyBuf)
+	// if err != nil {
+	// 	log.Fatalf("Failed to parse public key: %v", err)
+	// }
+
+	// hostPubKy, err := ssh.ParsePublicKey(hostKey.Marshal())
 	// if err != nil {
 	// 	log.Fatalf("Failed to parse public key: %v", err)
 	// }
@@ -32,20 +38,14 @@ func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: func(
-			hostname string,
-			remote net.Addr,
-			hostKey ssh.PublicKey) error {
-			return nil
-		},
-		// HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// HostKeyCallback: ssh.FixedHostKey(hostKey),
-		// HostKeyAlgorithms: []string{
-		// 	"aes256-cbc", "aes128-cbc",
-		// 	"3des-cbc", "des-cbc",
-		// 	"ssh-rsa", "rsa-sha2-512",
-		// 	"rsa-sha2-256", "ecdsa-sha2-nistp256",
-		// 	"ssh-ed25519"},
+		// HostKeyCallback: ssh.FixedHostKey(hostPubKy),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyAlgorithms: []string{
+			"aes256-cbc", "aes128-cbc",
+			"3des-cbc", "des-cbc",
+			"ssh-rsa", "rsa-sha2-512",
+			"rsa-sha2-256", "ecdsa-sha2-nistp256",
+			"ssh-ed25519"},
 	}
 	return sshClientConfig
 }
