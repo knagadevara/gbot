@@ -1,6 +1,7 @@
 package utl
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -14,38 +15,78 @@ import (
 )
 
 // LoadSshConfig loads SSH configuration for a given user
-func (sh *SShCfg) LoadSshConfig(userName string) *ssh.ClientConfig {
+func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
 
-	privateKeyBuf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
-	signer, err := ssh.ParsePrivateKey(privateKeyBuf)
+	fmt.Println("Loading Config for " + hostName)
+
+	PkBf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
+	PkSigner, err := ssh.ParsePrivateKey(PkBf)
 	if err != nil {
 		log.Fatalf("Failed to parse private key: %v", err)
 	}
 
-	// publicKeyBuf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pub"}, ""))
-	// hostKey, _, _, _, err := ssh.ParseAuthorizedKey(publicKeyBuf)
-	// if err != nil {
-	// 	log.Fatalf("Failed to parse public key: %v", err)
-	// }
-
-	// hostPubKy, err := ssh.ParsePublicKey(hostKey.Marshal())
-	// if err != nil {
-	// 	log.Fatalf("Failed to parse public key: %v", err)
-	// }
+	var hostKeyCallBack ssh.HostKeyCallback
+	PbBf1, err := os.OpenFile(sh.Path+"known_hosts", os.O_RDONLY, 0644)
+	if err != nil {
+		log.Fatalf("Failed to parse public key: %v", err)
+	}
+	defer PbBf1.Close()
+	PbScanr := bufio.NewScanner(PbBf1)
+	for PbScanr.Scan() {
+		AllKnownKeys := strings.Split(PbScanr.Text(), "\r\n")
+		for _, keyLine := range AllKnownKeys {
+			keyWords := strings.Split(keyLine, " ")
+			if hostName == keyWords[0] {
+				fmt.Println(keyLine)
+				hKey1, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyLine))
+				if err != nil {
+					log.Fatalf("Failed to parse public key: %v", err)
+				}
+				hostKey, err := ssh.ParsePublicKey(hKey1.Marshal())
+				if err != nil {
+					log.Fatalf("Failed to parse public key: %v", err)
+				}
+				hostKeyCallBack = ssh.FixedHostKey(hostKey)
+				fmt.Println("Found HostKey")
+			} else {
+				continue
+			}
+			if hostKeyCallBack == nil {
+				var hostKey ssh.PublicKey
+				hostKeyCallBack = ssh.FixedHostKey(hostKey)
+				fmt.Println("NIL Key Loaded")
+			}
+		}
+	}
 
 	sshClientConfig := &ssh.ClientConfig{
 		User: userName,
 		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
+			ssh.PublicKeys(PkSigner),
 		},
-		// HostKeyCallback: ssh.FixedHostKey(hostPubKy),
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallBack,
+		// HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		HostKeyAlgorithms: []string{
-			"aes256-cbc", "aes128-cbc",
-			"3des-cbc", "des-cbc",
-			"ssh-rsa", "rsa-sha2-512",
-			"rsa-sha2-256", "ecdsa-sha2-nistp256",
-			"ssh-ed25519"},
+			"ssh-rsa-cert-v01@openssh.com",
+			"ssh-dss-cert-v01@openssh.com",
+			"ecdsa-sha2-nistp256-cert-v01@openssh.com",
+			"ecdsa-sha2-nistp384-cert-v01@openssh.com",
+			"ecdsa-sha2-nistp521-cert-v01@openssh.com",
+			"sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
+			"ssh-ed25519-cert-v01@openssh.com",
+			"sk-ssh-ed25519-cert-v01@openssh.com",
+			"aes256-cbc",
+			"aes128-cbc",
+			"3des-cbc",
+			"des-cbc",
+			"ssh-rsa",
+			"rsa-sha2-512",
+			"rsa-sha2-256",
+			"ecdsa-sha2-nistp256",
+			"sk-ecdsa-sha2-nistp256@openssh.com",
+			"sk-ssh-ed25519@openssh.com",
+			"ssh-ed25519",
+		},
 	}
 	return sshClientConfig
 }
@@ -186,8 +227,9 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) chan map[st
 }
 
 func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
-	sshJumpConfig := hj.SSHConfig.LoadSshConfig(hj.BastionAuth.Uname)
-	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname)
+
+	sshJumpConfig := hj.SSHConfig.LoadSshConfig(hj.BastionAuth.Uname, hj.BastionAuth.Name)
+	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname, hj.HostAuth.Name)
 
 	sshJumpClient, err := DialHost(
 		sshJumpConfig,
@@ -211,17 +253,17 @@ func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *s
 		hostConnection,
 		hj.HostAuth.Name,
 		sshRmtConfig)
-
 	if err != nil {
 		log.Fatalln(err)
 		return nil, nil, errors.New(err.Error())
 	}
-	return rmtHstSshClient, sshJumpClient, nil
 
+	return rmtHstSshClient, sshJumpClient, nil
+	// return nil, nil, nil
 }
 
 func (hj *HJSShConfig) CreateSshClientHost() (*ssh.Client, error) {
-	sshConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname)
+	sshConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname, hj.HostAuth.Name)
 	sshClient, err := DialHost(sshConfig,
 		hj.HostAuth.Name,
 		hj.SSHConfig.Port)
