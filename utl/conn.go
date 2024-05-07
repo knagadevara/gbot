@@ -16,9 +16,6 @@ import (
 
 // LoadSshConfig loads SSH configuration for a given user
 func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
-
-	fmt.Println("Loading Config for " + hostName)
-
 	PkBf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
 	PkSigner, err := ssh.ParsePrivateKey(PkBf)
 	if err != nil {
@@ -47,44 +44,41 @@ func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
 					log.Fatalf("Failed to parse public key: %v", err)
 				}
 				hostKeyCallBack = ssh.FixedHostKey(hostKey)
-				fmt.Println("Found HostKey")
+				fmt.Println("Loaded HostKey")
 			} else {
 				continue
 			}
-			if hostKeyCallBack == nil {
-				var hostKey ssh.PublicKey
-				hostKeyCallBack = ssh.FixedHostKey(hostKey)
-				fmt.Println("NIL Key Loaded")
-			}
 		}
 	}
-
+	if hostKeyCallBack == nil {
+		hostKeyCallBack = ssh.InsecureIgnoreHostKey()
+		fmt.Println("Insecure Logging")
+	}
 	sshClientConfig := &ssh.ClientConfig{
 		User: userName,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(PkSigner),
 		},
 		HostKeyCallback: hostKeyCallBack,
-		// HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		HostKeyAlgorithms: []string{
-			"ssh-rsa-cert-v01@openssh.com",
-			"ssh-dss-cert-v01@openssh.com",
-			"ecdsa-sha2-nistp256-cert-v01@openssh.com",
-			"ecdsa-sha2-nistp384-cert-v01@openssh.com",
-			"ecdsa-sha2-nistp521-cert-v01@openssh.com",
-			"sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
-			"ssh-ed25519-cert-v01@openssh.com",
-			"sk-ssh-ed25519-cert-v01@openssh.com",
-			"aes256-cbc",
-			"aes128-cbc",
-			"3des-cbc",
-			"des-cbc",
+			// "ssh-rsa-cert-v01@openssh.com",
+			// "ssh-dss-cert-v01@openssh.com",
+			// "ecdsa-sha2-nistp256-cert-v01@openssh.com",
+			// "ecdsa-sha2-nistp384-cert-v01@openssh.com",
+			// "ecdsa-sha2-nistp521-cert-v01@openssh.com",
+			// "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
+			// "ssh-ed25519-cert-v01@openssh.com",
+			// "sk-ssh-ed25519-cert-v01@openssh.com",
+			// "aes256-cbc",
+			// "aes128-cbc",
+			// "3des-cbc",
+			// "des-cbc",
 			"ssh-rsa",
 			"rsa-sha2-512",
 			"rsa-sha2-256",
 			"ecdsa-sha2-nistp256",
-			"sk-ecdsa-sha2-nistp256@openssh.com",
-			"sk-ssh-ed25519@openssh.com",
+			// "sk-ecdsa-sha2-nistp256@openssh.com",
+			// "sk-ssh-ed25519@openssh.com",
 			"ssh-ed25519",
 		},
 	}

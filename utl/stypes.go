@@ -9,7 +9,7 @@ type SShCfg struct {
 
 type HostAuth struct {
 	Name  string `yaml:"hostname"`
-	Uname string `yaml:"uname"`
+	Uname string `yaml:"host.uname"`
 }
 
 type BastionAuth struct {
