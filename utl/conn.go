@@ -16,9 +16,8 @@ import (
 	ssh "golang.org/x/crypto/ssh"
 )
 
+// Load Hostkey, create if known hosts does not exist.
 func loadFile(name string, flag int, perm fs.FileMode) *os.File {
-
-	// Load Hostkey, create if known hosts does not exist.
 	binBf, err := os.OpenFile(name, flag, perm)
 	if err != nil {
 		log.Fatalf("Failed to parse public key: %v", err)
@@ -26,14 +25,11 @@ func loadFile(name string, flag int, perm fs.FileMode) *os.File {
 	return binBf
 }
 
+// Scan the known_hosts file create a dictionary of types.
 func (sh *SShCfg) scanKnownHostKeys(hostName string) map[string]string {
-
 	var foundHostKeys = make(map[string]string)
-
-	PbBf := loadFile(strings.Join([]string{sh.Path, "known_hosts"}, ""), os.O_RDONLY, 0400)
+	PbBf := loadFile(strings.Join([]string{sh.Path, "known_hosts"}, ""), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0400)
 	defer PbBf.Close()
-
-	// Scan the known_hosts file create adictionary by types.
 	PbScanr := bufio.NewScanner(PbBf)
 	for PbScanr.Scan() {
 		AllKnownKeys := strings.Split(PbScanr.Text(), "\r\n")
@@ -80,7 +76,6 @@ func (sh *SShCfg) trustedHostKeyCallback(hkeys map[string]string, hostName strin
 			}
 			return fmt.Errorf("SSH-key verification: expected %q but got %q", trustedKey, ks)
 		}
-
 	} else {
 		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
 			sh.WriteKey(hostName, k)
@@ -91,18 +86,14 @@ func (sh *SShCfg) trustedHostKeyCallback(hkeys map[string]string, hostName strin
 
 // LoadSshConfig loads SSH configuration for a given user
 func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
-
 	var hostKeyCallBack ssh.HostKeyCallback
-
 	// Load Private Key and make a signer
 	PkBf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
 	PkSigner, err := ssh.ParsePrivateKey(PkBf)
 	if err != nil {
 		log.Fatalf("Failed to parse private key: %v", err)
 	}
-
 	hostKeyCallBack = sh.trustedHostKeyCallback(sh.scanKnownHostKeys(hostName), hostName)
-
 	if hostKeyCallBack == nil {
 		hostKeyCallBack = ssh.InsecureIgnoreHostKey()
 		fmt.Println("Insecure Logging")
@@ -113,7 +104,6 @@ func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
 			ssh.PublicKeys(PkSigner),
 		},
 		HostKeyCallback: hostKeyCallBack,
-
 		HostKeyAlgorithms: []string{
 			"ssh-rsa-cert-v01@openssh.com", "ssh-dss-cert-v01@openssh.com",
 			"ecdsa-sha2-nistp256-cert-v01@openssh.com", "ecdsa-sha2-nistp384-cert-v01@openssh.com",
@@ -239,37 +229,29 @@ func ExecuteCommand(rmtHstSshClient *ssh.Client, commands ...string) chan map[st
 	sessionOutChan := make(chan map[string]string, len(commands))
 	var wg sync.WaitGroup
 	wg.Add(len(commands))
-
 	executeCommand := func(hotcommand string) {
 		defer wg.Done()
-
 		session := CreateSession(rmtHstSshClient)
 		defer session.Close()
-
 		cmOut, err := session.CombinedOutput(hotcommand)
 		if err != nil {
 			log.Fatal(hotcommand, err)
 		}
 		sessionOutChan <- map[string]string{hotcommand: string(cmOut)}
 	}
-
 	for _, command := range commands {
 		go executeCommand(command)
 	}
-
 	go func() {
 		defer close(sessionOutChan)
 		wg.Wait()
 	}()
-
 	return sessionOutChan
 }
 
 func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *ssh.Client, err error) {
-
 	sshJumpConfig := hj.SSHConfig.LoadSshConfig(hj.BastionAuth.Uname, hj.BastionAuth.Name)
 	sshRmtConfig := hj.SSHConfig.LoadSshConfig(hj.HostAuth.Uname, hj.HostAuth.Name)
-
 	sshJumpClient, err := DialHost(
 		sshJumpConfig,
 		hj.BastionAuth.Name,
@@ -278,7 +260,6 @@ func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *s
 		log.Fatalln(err)
 		return nil, nil, errors.New(err.Error())
 	}
-
 	hostConnection, err := ConnHost(
 		sshJumpClient,
 		hj.HostAuth.Name,
@@ -287,7 +268,6 @@ func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *s
 		log.Fatalln(err)
 		return nil, nil, errors.New(err.Error())
 	}
-
 	rmtHstSshClient, err := MakeNewClientConn(
 		hostConnection,
 		hj.HostAuth.Name,
@@ -296,9 +276,7 @@ func (hj *HJSShConfig) CreateSshClientJumpHost() (rmtHstSshClt, JumpSshClient *s
 		log.Fatalln(err)
 		return nil, nil, errors.New(err.Error())
 	}
-
 	return rmtHstSshClient, sshJumpClient, nil
-	// return nil, nil, nil
 }
 
 func (hj *HJSShConfig) CreateSshClientHost() (*ssh.Client, error) {
