@@ -2,9 +2,11 @@ package utl
 
 import (
 	"bufio"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"os"
@@ -14,42 +16,93 @@ import (
 	ssh "golang.org/x/crypto/ssh"
 )
 
+func loadFile(name string, flag int, perm fs.FileMode) *os.File {
+
+	// Load Hostkey, create if known hosts does not exist.
+	binBf, err := os.OpenFile(name, flag, perm)
+	if err != nil {
+		log.Fatalf("Failed to parse public key: %v", err)
+	}
+	return binBf
+}
+
+func (sh *SShCfg) scanKnownHostKeys(hostName string) map[string]string {
+
+	var foundHostKeys = make(map[string]string)
+
+	PbBf := loadFile(strings.Join([]string{sh.Path, "known_hosts"}, ""), os.O_RDONLY, 0400)
+	defer PbBf.Close()
+
+	// Scan the known_hosts file create adictionary by types.
+	PbScanr := bufio.NewScanner(PbBf)
+	for PbScanr.Scan() {
+		AllKnownKeys := strings.Split(PbScanr.Text(), "\r\n")
+		for _, keyLine := range AllKnownKeys {
+			keyWords := strings.Split(keyLine, " ")
+			if hostName == keyWords[0] {
+				foundHostKeys[keyWords[1]] = keyWords[2]
+			} else {
+				continue
+			}
+		}
+	}
+	return foundHostKeys
+}
+
+// create human-readable SSH-key strings
+func keyString(k ssh.PublicKey) string {
+	return fmt.Sprintf(k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal()))
+}
+
+func (sh *SShCfg) WriteKey(hostName string, k ssh.PublicKey) {
+	PbBf := loadFile(strings.Join([]string{sh.Path, "known_hosts"}, ""), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	defer PbBf.Close()
+	_, err := PbBf.WriteString(fmt.Sprintf(hostName+" "+k.Type()+" "+base64.StdEncoding.EncodeToString(k.Marshal())) + "\n\n")
+	if err != nil {
+		log.Fatalf("Failed to Write: %v", err)
+	}
+	fmt.Printf("WARNING: SSH-key verification is *NOT* in effect: to fix, add this trustedKey: %q", keyString(k))
+}
+
+func (sh *SShCfg) trustedHostKeyCallback(hkeys map[string]string, hostName string) ssh.HostKeyCallback {
+	if len(hkeys) > 0 {
+		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			hKey, ok := hkeys[k.Type()]
+			trustedKey := fmt.Sprintf(k.Type() + " " + hKey)
+			ks := keyString(k)
+			if ok {
+				if trustedKey == ks {
+					return nil
+				}
+			} else {
+				sh.WriteKey(hostName, k)
+				return nil
+			}
+			return fmt.Errorf("SSH-key verification: expected %q but got %q", trustedKey, ks)
+		}
+
+	} else {
+		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			sh.WriteKey(hostName, k)
+			return nil
+		}
+	}
+}
+
 // LoadSshConfig loads SSH configuration for a given user
 func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
+
+	var hostKeyCallBack ssh.HostKeyCallback
+
+	// Load Private Key and make a signer
 	PkBf := LoadFile(strings.Join([]string{sh.Path, sh.PK, ".pem"}, ""))
 	PkSigner, err := ssh.ParsePrivateKey(PkBf)
 	if err != nil {
 		log.Fatalf("Failed to parse private key: %v", err)
 	}
 
-	var hostKeyCallBack ssh.HostKeyCallback
-	PbBf1, err := os.OpenFile(sh.Path+"known_hosts", os.O_RDONLY, 0644)
-	if err != nil {
-		log.Fatalf("Failed to parse public key: %v", err)
-	}
-	defer PbBf1.Close()
-	PbScanr := bufio.NewScanner(PbBf1)
-	for PbScanr.Scan() {
-		AllKnownKeys := strings.Split(PbScanr.Text(), "\r\n")
-		for _, keyLine := range AllKnownKeys {
-			keyWords := strings.Split(keyLine, " ")
-			if hostName == keyWords[0] {
-				fmt.Println(keyLine)
-				hKey1, _, _, _, err := ssh.ParseAuthorizedKey([]byte(keyLine))
-				if err != nil {
-					log.Fatalf("Failed to parse public key: %v", err)
-				}
-				hostKey, err := ssh.ParsePublicKey(hKey1.Marshal())
-				if err != nil {
-					log.Fatalf("Failed to parse public key: %v", err)
-				}
-				hostKeyCallBack = ssh.FixedHostKey(hostKey)
-				fmt.Println("Loaded HostKey")
-			} else {
-				continue
-			}
-		}
-	}
+	hostKeyCallBack = sh.trustedHostKeyCallback(sh.scanKnownHostKeys(hostName), hostName)
+
 	if hostKeyCallBack == nil {
 		hostKeyCallBack = ssh.InsecureIgnoreHostKey()
 		fmt.Println("Insecure Logging")
@@ -60,25 +113,17 @@ func (sh *SShCfg) LoadSshConfig(userName, hostName string) *ssh.ClientConfig {
 			ssh.PublicKeys(PkSigner),
 		},
 		HostKeyCallback: hostKeyCallBack,
+
 		HostKeyAlgorithms: []string{
-			// "ssh-rsa-cert-v01@openssh.com",
-			// "ssh-dss-cert-v01@openssh.com",
-			// "ecdsa-sha2-nistp256-cert-v01@openssh.com",
-			// "ecdsa-sha2-nistp384-cert-v01@openssh.com",
-			// "ecdsa-sha2-nistp521-cert-v01@openssh.com",
-			// "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
-			// "ssh-ed25519-cert-v01@openssh.com",
-			// "sk-ssh-ed25519-cert-v01@openssh.com",
-			// "aes256-cbc",
-			// "aes128-cbc",
-			// "3des-cbc",
-			// "des-cbc",
-			"ssh-rsa",
-			"rsa-sha2-512",
-			"rsa-sha2-256",
-			"ecdsa-sha2-nistp256",
-			// "sk-ecdsa-sha2-nistp256@openssh.com",
-			// "sk-ssh-ed25519@openssh.com",
+			"ssh-rsa-cert-v01@openssh.com", "ssh-dss-cert-v01@openssh.com",
+			"ecdsa-sha2-nistp256-cert-v01@openssh.com", "ecdsa-sha2-nistp384-cert-v01@openssh.com",
+			"ecdsa-sha2-nistp521-cert-v01@openssh.com", "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
+			"ssh-ed25519-cert-v01@openssh.com", "sk-ssh-ed25519-cert-v01@openssh.com",
+			"aes256-cbc", "aes128-cbc",
+			"3des-cbc", "des-cbc",
+			"ssh-rsa", "rsa-sha2-512",
+			"rsa-sha2-256", "ecdsa-sha2-nistp256",
+			"sk-ecdsa-sha2-nistp256@openssh.com", "sk-ssh-ed25519@openssh.com",
 			"ssh-ed25519",
 		},
 	}
