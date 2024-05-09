@@ -9,15 +9,13 @@ import (
 )
 
 var (
-	hj         *utl.HJSShConfig
 	host, jump *ssh.Client
-	yamlBuf    []byte
 )
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	yamlBuf = utl.LoadFile("files/config.yaml")
-	hj = utl.ParseCfg(yamlBuf)
+	yamlBuf := utl.LoadFile("files/config.yaml")
+	hj := utl.ParseCfg(yamlBuf)
 	host, jump = hj.JumpOrNot()
 }
 

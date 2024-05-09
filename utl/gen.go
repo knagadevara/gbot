@@ -23,11 +23,11 @@ func LoadFile(flPth string) []byte {
 }
 
 // takes a host name and gives out full domain name and host name
-func (hj *HJSShConfig) MapHostDc(hostname string) error {
+func (hj *HJSShConfig) MapHostDc(hostname, sep string) error {
 	if hostname == "" {
 		return errors.New("empty hostname")
 	} else {
-		tmpVar := strings.Split(hostname, "-")
+		tmpVar := strings.Split(hostname, sep)
 
 		hj.Dx.DataCenter = tmpVar[1]
 
@@ -103,7 +103,7 @@ func ParseCfg(yamlBuf []byte) *HJSShConfig {
 	hj.BastionAuth = &bastionAuth
 	hj.Dx = &dcdn
 	hstName := SourceHostName()
-	err = hj.MapHostDc(hstName)
+	err = hj.MapHostDc(hstName, "-")
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
